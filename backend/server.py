@@ -1,4 +1,6 @@
 from flask import Flask, request, Response
+from flask_cors import CORS
+
 from twilio.twiml.voice_response import Dial, VoiceResponse
 from twilio.rest import Client
 
@@ -31,6 +33,8 @@ def initialize_noicemail_users():
 initialize_noicemail_users()
 
 app = Flask(__name__)
+CORS(app)
+
 @app.post("/incoming")
 def incoming_call():
     response = VoiceResponse()
