@@ -7,6 +7,7 @@ import random
 import string
 import requests
 import os
+import json
 
 twilio_account_sid = os.environ['TWILIO_ACCOUNT_SID']
 twilio_auth_token = os.environ['TWILIO_AUTH_TOKEN']
@@ -53,11 +54,34 @@ async def handle_recording_webhook():
     deepgram_result = requests.post('https://api.beta.deepgram.com/v1/listen?multichannel=true&punctuate=true&analyze_sentiment=true&detect_language=true&detect_topics=true&summarize=true&detect_entities=true', json = { "url": recording_url }, headers = { 'Content-Type':'application/json', 'Authorization': 'Token {}'.format(deepgram_api_key) })
 
     print(deepgram_result.content)
-
-    # segment the deepgram results
+    deepgram_result = json.loads(deepgram_result.content)
 
     # send the sms messages (note: ignoring the returned values of the functions)
-    twilio_client.messages.create(body = deepgram_result, from_ = call.to, to = noicemail_users[call.to]['physical_phone_number'])
+    # report the detected language
+    detected_language = deepgram_result['results']['channels'][0]['detected_language']
+    print(detected_language)
+    twilio_client.messages.create(body = detected_language, from_ = twilio_central_number, to = noicemail_users[call.to]['physical_phone_number'])
+
+    # report the transcript
+    transcript = deepgram_result['results']['channels'][0]['alternatives'][0]['transcript']
+    print(transcript)
+    twilio_client.messages.create(body = transcript, from_ = twilio_central_number, to = noicemail_users[call.to]['physical_phone_number'])
+
+    # report the sentiment analysis
+    sentiment_segments = deepgram_result['results']['channels'][0]['alternatives'][0]['sentiment_segments']
+    negative = 0
+    neutral = 0
+    positive = 0
+    for sentiment_segment in sentiment_segments:
+        if sentiment_segment['sentiment'] == 'negative':
+            negative += 1
+        if sentiment_segment['sentiment'] == 'neutral':
+            neutral += 1
+        if sentiment_segment['sentiment'] == 'positive':
+            positive += 1
+    sentiment_message = 'positive: ' + str(positive) + '; neutral: ' + str(neutral) + '; negative: ' + str(negative)
+    print(sentiment_message)
+    twilio_client.messages.create(body = sentiment_message, from_ = twilio_central_number, to = noicemail_users[call.to]['physical_phone_number'])
 
     return Response('', 200, mimetype = "application/json")
 
