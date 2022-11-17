@@ -30,6 +30,9 @@ noicemail_users_db = db.getDb(os.environ['NOICEMAIL_DB'])
 app = Flask(__name__)
 CORS(app)
 
+def get_user(twilio_phone_number):
+    return noicemail_users_db.getBy({'twilio_phone_number': twilio_phone_number })[0]
+
 @app.post("/incoming")
 def incoming_call():
     response = VoiceResponse()
@@ -38,7 +41,7 @@ def incoming_call():
         recording_status_callback = recording_webhook_url
     )
 
-    user = noicemail_users_db.getBy({'twilio_phone_number': request.form['To']})[0]
+    user = get_user(request.form['To'])
     dial.number(user['physical_phone_number'])
     response.append(dial)
 
@@ -50,7 +53,7 @@ async def handle_recording_webhook():
 
     call_sid = request.form['CallSid']
     call = twilio_client.calls(call_sid).fetch()
-    user = noicemail_users_db.getBy({'twilio_phone_number': call.to})[0]
+    user = get_user(call.to)
 
     deepgram_result = requests.post('https://api.beta.deepgram.com/v1/listen?multichannel=true&punctuate=true&analyze_sentiment=true&detect_language=true&detect_topics=true&summarize=true&detect_entities=true', json = { "url": recording_url }, headers = { 'Content-Type':'application/json', 'Authorization': 'Token {}'.format(deepgram_api_key) })
 
@@ -157,6 +160,19 @@ def create_twilio_phone_number(physical_phone_number):
     noicemail_users_db.add(user)
 
     return twilio_phone_number_friendly
+
+@app.route("/users/<twilio_phone_number>/settings", methods = ["POST"])
+async def update_settings(twilio_phone_number):
+    user = get_user(twilio_phone_number)
+    body = request.json
+
+    for prop, value in body.items():
+        user[prop] = value
+
+    noicemail_users_db.updateById(user['id'], user)
+
+    return Response('', 200)
+
 
 if __name__ == "__main__":
    app.run(debug = True)
