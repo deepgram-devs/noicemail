@@ -4,6 +4,8 @@ from flask_cors import CORS
 from twilio.twiml.voice_response import Dial, VoiceResponse
 from twilio.rest import Client
 
+from pysondb import db
+
 import asyncio
 import random
 import string
@@ -19,18 +21,11 @@ deepgram_api_key = os.environ['DEEPGRAM_API_KEY']
 
 twilio_central_number = '+15133275732'
 codes = {}
-noicemail_users = {}
 
 recording_webhook_url = 'https://noicemail.deepgram.com/recording'
 incoming_webhook_url = 'https://noicemail.deepgram.com/incoming'
 
-# TODO: do this with a real database, or via the twilio api (or both)
-def initialize_noicemail_users():
-    noicemail_users['+17346362092'] = {}
-    noicemail_users['+17346362092']['physical_phone_number'] = '+17344787181'
-    noicemail_users['+17346362092']['analyze_sentiment'] = True
-
-initialize_noicemail_users()
+noicemail_users_db = db.getDb(os.environ['NOICEMAIL_DB'])
 
 app = Flask(__name__)
 CORS(app)
@@ -43,7 +38,8 @@ def incoming_call():
         recording_status_callback = recording_webhook_url
     )
 
-    dial.number(noicemail_users[request.form['To']]['physical_phone_number'])
+    user = noicemail_users_db.getBy({'twilio_phone_number': request.form['To']})
+    dial.number(user['physical_phone_number'])
     response.append(dial)
 
     return Response(str(response), 200, mimetype = 'application/xml')
@@ -54,6 +50,7 @@ async def handle_recording_webhook():
 
     call_sid = request.form['CallSid']
     call = twilio_client.calls(call_sid).fetch()
+    user = noicemail_users_db.getBy({'twilio_phone_number': call.to})
 
     deepgram_result = requests.post('https://api.beta.deepgram.com/v1/listen?multichannel=true&punctuate=true&analyze_sentiment=true&detect_language=true&detect_topics=true&summarize=true&detect_entities=true', json = { "url": recording_url }, headers = { 'Content-Type':'application/json', 'Authorization': 'Token {}'.format(deepgram_api_key) })
 
@@ -64,12 +61,12 @@ async def handle_recording_webhook():
     # report the detected language
     detected_language = deepgram_result['results']['channels'][0]['detected_language']
     print(detected_language)
-    twilio_client.messages.create(body = detected_language, from_ = twilio_central_number, to = noicemail_users[call.to]['physical_phone_number'])
+    twilio_client.messages.create(body = detected_language, from_ = twilio_central_number, to = user['physical_phone_number'])
 
     # report the transcript
     transcript = deepgram_result['results']['channels'][0]['alternatives'][0]['transcript']
     print(transcript)
-    twilio_client.messages.create(body = transcript, from_ = twilio_central_number, to = noicemail_users[call.to]['physical_phone_number'])
+    twilio_client.messages.create(body = transcript, from_ = twilio_central_number, to = user['physical_phone_number'])
 
     # report the sentiment analysis
     sentiment_segments = deepgram_result['results']['channels'][0]['alternatives'][0]['sentiment_segments']
@@ -85,7 +82,7 @@ async def handle_recording_webhook():
             positive += 1
     sentiment_message = 'positive: ' + str(positive) + '; neutral: ' + str(neutral) + '; negative: ' + str(negative)
     print(sentiment_message)
-    twilio_client.messages.create(body = sentiment_message, from_ = twilio_central_number, to = noicemail_users[call.to]['physical_phone_number'])
+    twilio_client.messages.create(body = sentiment_message, from_ = twilio_central_number, to = user['physical_phone_number'])
 
     return Response('', 200, mimetype = "application/json")
 
@@ -125,9 +122,11 @@ def create_twilio_phone_number(physical_phone_number):
     twilio_client.incoming_phone_numbers.create(phone_number = twilio_phone_number, voice_url = incoming_webhook_url)
 
     # create the noicemail user
-    noicemail_users[twilio_phone_number] = {}
-    noicemail_users[twilio_phone_number]['physical_phone_number'] = physical_phone_number
-    noicemail_users[twilio_phone_number]['analyze_sentiment'] = True
+    user = {}
+    user['physical_phone_number'] = physical_phone_number
+    user['analyze_sentiment'] = True
+    user['twilio_phone_number'] = twilio_phone_number
+    noicemail_users_db.add(user)
 
     return twilio_phone_number_friendly
 
