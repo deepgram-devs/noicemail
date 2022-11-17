@@ -98,6 +98,14 @@ async def handle_recording_webhook():
         topics_message = "Topics: " + ', '.join(list(dict.fromkeys(topics)))
         twilio_client.messages.create(body = topics_message, from_ = twilio_central_number, to = user['physical_phone_number'])
 
+    if user['summarize']:
+        summaries = []
+        summary_objects = deepgram_result['results']['channels'][0]['alternatives'][0]['summaries']
+        for summary_object in summary_objects:
+            summaries.append(summary_object['summary'])
+        summaries_message = "Summary: " + ' '.join(summaries)
+        twilio_client.messages.create(body = summaries_message, from_ = twilio_central_number, to = user['physical_phone_number'])
+
     return Response('', 200, mimetype = "application/json")
 
 @app.route("/codes", methods = ['POST'])
