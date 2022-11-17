@@ -57,6 +57,9 @@ async def handle_recording_webhook():
     print(deepgram_result.content)
     deepgram_result = json.loads(deepgram_result.content)
 
+    initial_message = "New voicemail from: " + call.from_
+    twilio_client.messages.create(body = initial_message, from_ = twilio_central_number, to = user['physical_phone_number'])
+
     # send the sms messages (note: ignoring the returned values of the functions)
     # report the detected language
     if user['detect_language']:
@@ -83,8 +86,17 @@ async def handle_recording_webhook():
                 neutral += 1
             if sentiment_segment['sentiment'] == 'positive':
                 positive += 1
-        analyze_sentiment_message = 'Sentiment analysis: positive: ' + str(positive) + '; neutral: ' + str(neutral) + '; negative: ' + str(negative)
+        analyze_sentiment_message = 'Sentiment analysis: ' + ('\U0001F642' * positive) + ' ' + ('\U0001F610' * neutral) + ' ' + ('\U0001F641' * negative)
         twilio_client.messages.create(body = analyze_sentiment_message, from_ = twilio_central_number, to = user['physical_phone_number'])
+
+    if user['detect_topics']:
+        topics = []
+        topic_objects = deepgram_result['results']['channels'][0]['alternatives'][0]['topics']
+        for topic_object in topic_objects:
+            for topic in topic_object['topics']:
+                topics.append(topic['topic'])
+        topics_message = "Topics: " + ', '.join(list(dict.fromkeys(topics)))
+        twilio_client.messages.create(body = topics_message, from_ = twilio_central_number, to = user['physical_phone_number'])
 
     return Response('', 200, mimetype = "application/json")
 
