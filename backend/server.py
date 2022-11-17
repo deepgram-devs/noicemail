@@ -38,7 +38,7 @@ def incoming_call():
         recording_status_callback = recording_webhook_url
     )
 
-    user = noicemail_users_db.getBy({'twilio_phone_number': request.form['To']})
+    user = noicemail_users_db.getBy({'twilio_phone_number': request.form['To']})[0]
     dial.number(user['physical_phone_number'])
     response.append(dial)
 
@@ -50,7 +50,7 @@ async def handle_recording_webhook():
 
     call_sid = request.form['CallSid']
     call = twilio_client.calls(call_sid).fetch()
-    user = noicemail_users_db.getBy({'twilio_phone_number': call.to})
+    user = noicemail_users_db.getBy({'twilio_phone_number': call.to})[0]
 
     deepgram_result = requests.post('https://api.beta.deepgram.com/v1/listen?multichannel=true&punctuate=true&analyze_sentiment=true&detect_language=true&detect_topics=true&summarize=true&detect_entities=true', json = { "url": recording_url }, headers = { 'Content-Type':'application/json', 'Authorization': 'Token {}'.format(deepgram_api_key) })
 
