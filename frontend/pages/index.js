@@ -12,7 +12,7 @@ export default function Home() {
   const [code, setCode] = useState("")
   const [phoneNumber, setPhoneNumber] = useState("")
   const [showCodePrompt, setShowCodePrompt] = useState(false)
-  const [noiceNumber, setNoiceNumber] = useState("(310) 341-7982")
+  const [noiceNumber, setNoiceNumber] = useState("")
   const [features, setFeatures] = useState({
     analyze_sentiment: true,
     detect_topics: true,
