@@ -19,11 +19,11 @@ twilio_client = Client(twilio_account_sid, twilio_auth_token)
 
 deepgram_api_key = os.environ['DEEPGRAM_API_KEY']
 
-twilio_central_number = '+15133275732'
+twilio_central_number = os.environ['TWILIO_CENTRAL_NUMBER']
 codes = {}
 
-recording_webhook_url = 'https://noicemail.deepgram.com/recording'
-incoming_webhook_url = 'https://noicemail.deepgram.com/incoming'
+recording_webhook_url = os.environ['RECORDING_WEBHOOK_URL']
+incoming_webhook_url = os.environ['INCOMING_WEBHOOK_URL']
 
 noicemail_users_db = db.getDb(os.environ['NOICEMAIL_DB'])
 
