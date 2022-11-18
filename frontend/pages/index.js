@@ -4,27 +4,32 @@ import { useState } from 'react'
 
 const REQUEST_CODE_URL = "https://noicemail.deepgram.com/codes"
 const SIGNUP_URL = "https://noicemail.deepgram.com/users"
+const SETTINGS_URL = "https://noicemail.deepgram.com/users/<noice_number>/settings"
+
 const TAGLINE = "It should've been a text anyways"
-const options = [
-  { display_name: "Summarize", slug: "summarize" },
-  { display_name: "Detect topics", slug: "detect_topics" },
-  { display_name: "Detect Language", slug: "detect_language" },
-  { display_name: "Analyze Sentiment", slug: "analyze_sentiment" },
-  { display_name: "Detect Entities", slug: "detect_entities" },
-  { display_name: "Transcribe", slug: "transcribe" },
-];
 
 export default function Home() {
   const [code, setCode] = useState("")
   const [phoneNumber, setPhoneNumber] = useState("")
   const [showCodePrompt, setShowCodePrompt] = useState(false)
   const [noiceNumber, setNoiceNumber] = useState("")
-  const [features, setFeatures] = useState({})
+  const [features, setFeatures] = useState({
+    analyze_sentiment: true,
+    detect_topics: true,
+    detect_language: true,
+    detect_entities: true,
+    summarize: true,
+    transcribe: true,
+    translate: true,
+  })
 
+  /**
+   * Handler to submit a user's phone number and receive a verification code.
+   */
   const handlePhoneSubmit = async (e) => {
     e.preventDefault();
     if (isPhoneNumberValid(phoneNumber)) {
-      let data = { physical_phone_number: "+1" + phoneNumber }
+      let data = { physical_phone_number: formatPhoneNumber(phoneNumber) }
       const response = await fetch(REQUEST_CODE_URL, {
         method: 'POST',
         headers: {
@@ -34,16 +39,21 @@ export default function Home() {
       });
       if (response.status == 201) {
         setShowCodePrompt(true);
+      } else {
+        alert("Something went wrong!")
       }
     } else {
       console.log("Bad phone number")
     }
   }
 
+  /**
+   * Handler to submit the verifcation code and receive a noice number. 
+   */
   const handleCodeSubmit = async (e) => {
     e.preventDefault();
     if (code.length == 4) {
-      let data = { physical_phone_number: "+1" + phoneNumber, code }
+      let data = { physical_phone_number: formatPhoneNumber(phoneNumber), code }
       const response = await fetch(SIGNUP_URL, {
         method: 'POST',
         headers: {
@@ -55,10 +65,41 @@ export default function Home() {
         let noiceNumber = await response.text()
         console.log(noiceNumber)
         setNoiceNumber(noiceNumber)
+      } else {
+        alert("Something went wrong!")
       }
     }
   }
 
+  /**
+   * Handler to submit a user's ASR features.
+   */
+  const handleFeatureSubmit = async (e) => {
+    e.preventDefault();
+    const url = SETTINGS_URL.replace("<noice_number>", formatPhoneNumber(noiceNumber))
+    console.log(url)
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(features),
+    });
+    if (response.status != 200) {
+      alert("Something went wrong!")
+    } else {
+      alert("Updated!")
+    }
+  }
+
+  /**
+   * Prepends the "+1" country code to a phone number and removes any non digits.
+   */
+  const formatPhoneNumber = (phoneNumber) => "+1" + phoneNumber.replace(/\D/g, '');
+
+  /**
+   * Regex to check if a phone numer is formed xxx-xxx-xxxx
+   */
   const isPhoneNumberValid = (input) => {
     const regex = /^\(?([0-9]{3})\)?[-. ]?([0-9]{3})[-. ]?([0-9]{4})$/;
     if (regex.test(input)) {
@@ -70,6 +111,12 @@ export default function Home() {
     }
   }
 
+  const updateSettings = (key) => {
+    let current = features[key];
+
+    setFeatures({ ...features, [key]: !current, })
+  }
+
   const updatePhone = (e) => {
     setPhoneNumber(e.target.value)
   }
@@ -78,13 +125,21 @@ export default function Home() {
     setCode(e.target.value)
   }
 
+  // Setup the feature buttons
+  let featureBtns = [];
+  for (const [key, value] of Object.entries(features)) {
+    let btnStyle = "button is-fullwidth my-2 is-medium";
+    btnStyle = value ? btnStyle + " is-noice-border" : btnStyle + " is-white";
+    const btn = <button key={key} className={btnStyle} onClick={() => updateSettings(key)}>{key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}</button>;
+    featureBtns.push(btn)
+  }
+
   return (
     <div className={styles.container}>
       <Head>
         <title>NOICEMAIL</title>
         <meta name="description" content="Noicemail signup" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="icon" href="/favicon.ico" />
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css"></link>
       </Head>
 
@@ -135,15 +190,17 @@ export default function Home() {
       }
       {noiceNumber &&
         <div className="container has-text-centered mt-5">
-          <h1>Your NoiceNumber is {noiceNumber}</h1>
+          <h1 className="has-text-weight-bold">Your NoiceNumber is {noiceNumber}</h1>
           <hr />
           <p>How would you like to analyze your voicemails?</p>
           <div className="has-text-centered">
-            <div className="">
-              {options.map((option, i) => <button key={i} className="button m-3">{option.display_name}</button>)}
+            <div className="container">
+              {featureBtns}
             </div>
             <div className="">
-              <button type="submit" className="button mt-3 is-noice has-text-white">Submit</button>
+              <form onSubmit={handleFeatureSubmit}>
+                <button type="submit" className="button mt-5 is-noice has-text-white is-medium">Submit</button>
+              </form>
             </div>
           </div>
         </div>
