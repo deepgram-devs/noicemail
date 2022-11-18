@@ -87,6 +87,8 @@ export default function Home() {
     });
     if (response.status != 200) {
       alert("Something went wrong!")
+    } else {
+      alert("Updated!")
     }
   }
 
