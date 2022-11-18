@@ -34,3 +34,13 @@ a {
 .is-noice {
   background-color: #00B4D8;
 }
+
+.is-noice-border {
+  border: solid #00B4D8;
+}
+
+.is-noice-border:active,
+.is-noice-border:hover,
+.is-noice-border:focus {
+  border: solid #00B4D8 !important
+}
